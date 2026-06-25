@@ -2,10 +2,9 @@
 
 on:
   push:
-    branches: ["main"] # mainブランチにプッシュされたら起動
-  workflow_dispatch:   # 手動実行ボタンも配置
+    branches: ["main"]
+  workflow_dispatch:
 
-# GitHub Pagesへの公開に必要な権限を設定
 permissions:
   contents: read
   pages: write
@@ -25,15 +24,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # C言語をブラウザ用に変換するツール(Emscripten)をセットアップ
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v14
 
-      # main.c を index.html にコンパイル
-      # ※ -s ASYNCIFY は、scanfの入力待ちでブラウザがフリーズするのを防ぐ必須オプションです
-      - name: Compile C to WebAssembly
+      - name: Compile C to WebAssembly (Web UI Mode)
+        # C言語の関数をJavaScriptから安全に呼び出せるようにエクスポートしてビルドします
         run: |
-          emcc main.c -o index.html -s ASYNCIFY
+          emcc main.c -o task_manager.js -s EXPORTED_FUNCTIONS="['_toggle_task', '_get_task_status']" -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" -s NO_EXIT_RUNTIME=1
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
