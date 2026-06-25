@@ -8,29 +8,32 @@
         .container { max-width: 900px; margin: 0 auto; }
         h1 { color: #2c3e50; text-align: center; margin-bottom: 20px; }
         
-        /* 教室入力・情報エリアのスタイル */
+        /* 教室・日付入力エリアのスタイル */
         .info-panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; display: table; width: 100%; box-sizing: border-box; }
         .info-block { display: table-cell; width: 50%; vertical-align: middle; }
         .info-block.right { text-align: right; }
-        .classroom-display { font-size: 18px; font-weight: bold; color: #2c3e50; }
+        .classroom-display { font-size: 16px; font-weight: bold; color: #2c3e50; }
         .classroom-badge { background-color: #e8f0fe; color: #1a73e8; padding: 4px 12px; border-radius: 12px; margin-left: 5px; }
         
-        input[type="text"] { padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; width: 180px; }
+        input[type="text"], input[type="date"] { padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
+        input[type="text"] { width: 180px; }
+        input[type="date"] { width: 160px; }
+        label { font-weight: bold; margin-right: 8px; color: #4a5568; }
         
         /* テーブルスタイル */
         table { border-collapse: collapse; width: 100%; background-color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; margin-top: 10px; }
         th, td { padding: 12px 15px; text-align: center; border-bottom: 1px solid #eeeeee; }
         th { background-color: #34495e; color: white; font-weight: bold; font-size: 14px; }
         
-        /* 状態ごとのスタイル分け */
-        .status-task-0 { background-color: #fce8e6; color: #a51d24; font-weight: bold; } /* 未提出 */
-        .status-task-1 { background-color: #e6f4ea; color: #137333; font-weight: bold; } /* 提出済 */
-        .status-task-2 { background-color: #f1f3f4; color: #5f6368; }                   /* 課題なし */
+        /* 状態ごとのスタイル */
+        .status-task-0 { background-color: #fce8e6; color: #a51d24; font-weight: bold; }
+        .status-task-1 { background-color: #e6f4ea; color: #137333; font-weight: bold; }
+        .status-task-2 { background-color: #f1f3f4; color: #5f6368; }
         
-        .status-attend-0 { background-color: #ffffff; color: #5f6368; }                  /* 未定 */
-        .status-attend-1 { background-color: #eaf5ea; color: #1e7e34; font-weight: bold; } /* 出席 */
-        .status-attend-2 { background-color: #fdf3e7; color: #d97706; font-weight: bold; } /* 遅刻 */
-        .status-attend-3 { background-color: #fce8e6; color: #c53030; font-weight: bold; } /* 欠席 */
+        .status-attend-0 { background-color: #ffffff; color: #5f6368; }
+        .status-attend-1 { background-color: #eaf5ea; color: #1e7e34; font-weight: bold; }
+        .status-attend-2 { background-color: #fdf3e7; color: #d97706; font-weight: bold; }
+        .status-attend-3 { background-color: #fce8e6; color: #c53030; font-weight: bold; }
 
         button { padding: 6px 12px; cursor: pointer; background-color: #3498db; color: white; border: none; border-radius: 4px; font-size: 13px; transition: background 0.2s; }
         button:hover { background-color: #2980b9; }
@@ -39,6 +42,7 @@
         
         /* エラー表示 */
         .error-message { padding: 12px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 4px; display: none; text-align: center; font-weight: bold; margin-bottom: 20px; }
+        .divider { border-top: 1px solid #e2e8f0; margin: 15px 0; }
     </style>
 </head>
 <body>
@@ -49,12 +53,21 @@
         <div id="error-container" class="error-message"></div>
 
         <div class="info-panel">
-            <div class="info-block">
-                <span class="classroom-display">現在の教室: <span id="room-text" class="classroom-badge">未設定</span></span>
+            <div style="display: table-row;">
+                <div class="info-block">
+                    <label for="base-date-input">第1回授業日:</label>
+                    <input type="date" id="base-date-input">
+                </div>
+                <div class="info-block right">
+                    <input type="text" id="room-input" placeholder="例: 3号館302教室">
+                    <button id="room-submit-btn" class="btn-success">教室を変更</button>
+                </div>
             </div>
-            <div class="info-block right">
-                <input type="text" id="room-input" placeholder="例: 3号館302教室">
-                <button id="room-submit-btn" class="btn-success">教室を変更</button>
+            <div class="divider"></div>
+            <div style="display: table-row;">
+                <div class="info-block" style="display: table-cell; width: 100%;">
+                    <span class="classroom-display">現在の教室: <span id="room-text" class="classroom-badge">未設定</span></span>
+                </div>
             </div>
         </div>
 
@@ -76,7 +89,6 @@
 
     <script src="task_manager.js"></script>
     <script>
-        // マッピング定義
         const taskMap = {
             0: { text: "未提出", class: "status-task-0" },
             1: { text: "提出済", class: "status-task-1" },
@@ -86,47 +98,86 @@
         const attendMap = {
             0: { text: "未定", class: "status-attend-0" },
             1: { text: "出席", class: "status-attend-1" },
-            2: { text: "欠席", class: "status-attend-3" }, // C言語の2=欠席
-            3: { text: "遅刻", class: "status-attend-2" }  // C言語の3=遅刻
+            2: { text: "欠席", class: "status-attend-3" },
+            3: { text: "遅刻", class: "status-attend-2" }
         };
 
-        // サブ機能2: カレンダー自動生成関数 (本日から毎週木曜日の日付を設定する例)
-        function getLectureDate(weekIndex) {
-            let d = new Date();
-            // 直近の木曜日（または任意の曜日）に合わせる計算ロジック
-            d.setDate(d.getDate() + (weekIndex * 7));
-            return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-        }
+        // ラップ用グローバル関数ポインタ
+        let getTaskStatus, toggleTask, getAttendanceStatus, toggleAttendance;
+        let getClassroom, updateClassroom, setBaseDate, getBaseYear, getBaseMonth, getBaseDay;
 
         Module['onRuntimeInitialized'] = function() {
             // C言語関数のラップ
-            const getTaskStatus = Module.cwrap('get_task_status', 'number', ['number']);
-            const toggleTask = Module.cwrap('toggle_task', 'number', ['number']);
-            const getAttendanceStatus = Module.cwrap('get_attendance_status', 'number', ['number']);
-            const toggleAttendance = Module.cwrap('toggle_attendance', 'number', ['number']);
-            const getClassroom = Module.cwrap('get_classroom', 'string', []);
-            const updateClassroom = Module.cwrap('update_classroom', 'number', ['string']);
+            getTaskStatus = Module.cwrap('get_task_status', 'number', ['number']);
+            toggleTask = Module.cwrap('toggle_task', 'number', ['number']);
+            getAttendanceStatus = Module.cwrap('get_attendance_status', 'number', ['number']);
+            toggleAttendance = Module.cwrap('toggle_attendance', 'number', ['number']);
+            getClassroom = Module.cwrap('get_classroom', 'string', []);
+            updateClassroom = Module.cwrap('update_classroom', 'number', ['string']);
+            setBaseDate = Module.cwrap('set_base_date', 'number', ['number', 'number', 'number']);
+            getBaseYear = Module.cwrap('get_base_year', 'number', []);
+            getBaseMonth = Module.cwrap('get_base_month', 'number', []);
+            getBaseDay = Module.cwrap('get_base_day', 'number', []);
 
-            // 初期表示: 教室の場所
+            // 初期表示設定
             document.getElementById('room-text').textContent = getClassroom();
+            
+            // 初期の基準日（未設定の場合は本日の日付を初期候補としてカレンダーに入れる）
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            document.getElementById('base-date-input').value = `${yyyy}-${mm}-${dd}`;
+            
+            // C言語側に初期日付を設定
+            setBaseDate(yyyy, today.getMonth() + 1, today.getDate());
 
-            // 教室変更ボタンのイベント（手動入力とC言語でのバリデーション検証）
+            // 教室変更イベント
             document.getElementById('room-submit-btn').onclick = function() {
                 clearError();
                 const inputValue = document.getElementById('room-input').value.trim();
-                
-                // C言語側の関数を呼び出してバリデーションにかけつつ更新
                 const result = updateClassroom(inputValue);
-                
                 if (result === -2) {
                     showError("【エラー】教室の場所は1文字以上、31文字以内で入力してください。");
                 } else {
                     document.getElementById('room-text').textContent = getClassroom();
-                    document.getElementById('room-input').value = ""; // 入力欄をクリア
+                    document.getElementById('room-input').value = "";
                 }
             };
 
+            // ★カレンダー変更イベント（第1回が選ばれたらC言語に送り、テーブルを再描画）
+            document.getElementById('base-date-input').onchange = function() {
+                clearError();
+                const dateVal = this.value; // "YYYY-MM-DD"
+                if (!dateVal) return;
+
+                const parts = dateVal.split('-');
+                const year = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                const day = parseInt(parts[2], 10);
+
+                // C言語側のバリデーションを通す
+                const result = setBaseDate(year, month, day);
+                if (result === -3) {
+                    showError("【エラー】無効な日付が選択されました。");
+                } else {
+                    renderTable(); // 2回目以降を自動計算して再描画
+                }
+            };
+
+            // 初回テーブル描画
+            renderTable();
+        };
+
+        // ★第1回を基準に2回目以降の日付を自動計算してテーブルを構築する関数
+        function renderTable() {
             const tbody = document.getElementById('main-table-body');
+            tbody.innerHTML = ""; // 既存のテーブルをクリア
+
+            // C言語から現在の第1回授業日を取得
+            const by = getBaseYear();
+            const bm = getBaseMonth();
+            const bd = getBaseDay();
 
             // 13週分ループ生成
             for (let i = 1; i <= 13; i++) {
@@ -137,9 +188,15 @@
                 tdWeek.textContent = `第 ${i} 回`;
                 tr.appendChild(tdWeek);
 
-                // 2. カレンダー機能 (自動算出された日付を表示)
+                // 2. カレンダー機能 (第1回を基準に(i-1)週間後を自動計算)
                 const tdCal = document.createElement('td');
-                tdCal.textContent = getLectureDate(i - 1);
+                if (by === 0) {
+                    tdCal.textContent = "未設定";
+                } else {
+                    let dateObj = new Date(by, bm - 1, bd);
+                    dateObj.setDate(dateObj.getDate() + ((i - 1) * 7)); // 1週間(7日)ずつ加算
+                    tdCal.textContent = `${dateObj.getFullYear()}/${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+                }
                 tdCal.style.color = "#555";
                 tr.appendChild(tdCal);
 
@@ -166,7 +223,7 @@
                 updateCell(tdAttendStatus, getAttendanceStatus(i), attendMap);
                 tr.appendChild(tdAttendStatus);
 
-                // 6. 出席操作ボタン (選択/トグル式)
+                // 6. 出席操作ボタン
                 const tdAttendAction = document.createElement('td');
                 const btnAttend = document.createElement('button');
                 btnAttend.textContent = "出席切替";
@@ -181,7 +238,7 @@
 
                 tbody.appendChild(tr);
             }
-        };
+        }
 
         function updateCell(cell, statusValue, map) {
             cell.textContent = map[statusValue].text;
