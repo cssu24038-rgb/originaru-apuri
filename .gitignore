@@ -1,0 +1,5 @@
+# コンパイル済みの実行ファイル（Mac/Linux用、Windows用）
+task_manager
+task_manager.exe
+*.out
+*.o
