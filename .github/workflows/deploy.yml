@@ -1,0 +1,48 @@
+﻿name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: ["main"] # mainブランチにプッシュされたら起動
+  workflow_dispatch:   # 手動実行ボタンも配置
+
+# GitHub Pagesへの公開に必要な権限を設定
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # C言語をブラウザ用に変換するツール(Emscripten)をセットアップ
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+
+      # main.c を index.html にコンパイル
+      # ※ -s ASYNCIFY は、scanfの入力待ちでブラウザがフリーズするのを防ぐ必須オプションです
+      - name: Compile C to WebAssembly
+        run: |
+          emcc main.c -o index.html -s ASYNCIFY
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
