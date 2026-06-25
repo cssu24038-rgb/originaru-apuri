@@ -28,9 +28,9 @@ jobs:
         uses: mymindstorm/setup-emsdk@v14
 
       - name: Compile C to WebAssembly (Web UI Mode)
-        # C言語の関数をJavaScriptから安全に呼び出せるようにエクスポートしてビルドします
+        # 拡張したC言語関数群をエクスポート対象に追加してビルドします
         run: |
-          emcc main.c -o task_manager.js -s EXPORTED_FUNCTIONS="['_toggle_task', '_get_task_status']" -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" -s NO_EXIT_RUNTIME=1
+          emcc main.c -o task_manager.js -s EXPORTED_FUNCTIONS="['_toggle_task', '_get_task_status', '_get_attendance_status', '_toggle_attendance', '_get_classroom', '_update_classroom']" -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" -s NO_EXIT_RUNTIME=1
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

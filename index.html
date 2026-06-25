@@ -2,117 +2,198 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>課題提出管理アプリ (Web UI版)</title>
+    <title>講義提出・出席総合管理アプリ</title>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 30px; background-color: #f8f9fa; color: #333; }
-        h1 { color: #2c3e50; text-align: center; margin-bottom: 30px; }
-        table { border-collapse: collapse; width: 100%; max-width: 600px; margin: 0 auto; background-color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
-        th, td { padding: 15px; text-align: center; border-bottom: 1px solid #eeeeee; }
-        th { background-color: #34495e; color: white; font-weight: bold; }
-        /* 状態ごとの色分け */
-        .status-0 { background-color: #fce8e6; color: #a51d24; font-weight: bold; } /* 未提出 (赤系) */
-        .status-1 { background-color: #e6f4ea; color: #137333; font-weight: bold; } /* 提出済 (緑系) */
-        .status-2 { background-color: #f1f3f4; color: #5f6368; }                   /* 課題なし (グレー系) */
-        button { padding: 8px 16px; cursor: pointer; background-color: #3498db; color: white; border: none; border-radius: 4px; font-size: 14px; transition: background 0.2s; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 30px; background-color: #f4f6f9; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 20px; }
+        
+        /* 教室入力・情報エリアのスタイル */
+        .info-panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; display: table; width: 100%; box-sizing: border-box; }
+        .info-block { display: table-cell; width: 50%; vertical-align: middle; }
+        .info-block.right { text-align: right; }
+        .classroom-display { font-size: 18px; font-weight: bold; color: #2c3e50; }
+        .classroom-badge { background-color: #e8f0fe; color: #1a73e8; padding: 4px 12px; border-radius: 12px; margin-left: 5px; }
+        
+        input[type="text"] { padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; width: 180px; }
+        
+        /* テーブルスタイル */
+        table { border-collapse: collapse; width: 100%; background-color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; margin-top: 10px; }
+        th, td { padding: 12px 15px; text-align: center; border-bottom: 1px solid #eeeeee; }
+        th { background-color: #34495e; color: white; font-weight: bold; font-size: 14px; }
+        
+        /* 状態ごとのスタイル分け */
+        .status-task-0 { background-color: #fce8e6; color: #a51d24; font-weight: bold; } /* 未提出 */
+        .status-task-1 { background-color: #e6f4ea; color: #137333; font-weight: bold; } /* 提出済 */
+        .status-task-2 { background-color: #f1f3f4; color: #5f6368; }                   /* 課題なし */
+        
+        .status-attend-0 { background-color: #ffffff; color: #5f6368; }                  /* 未定 */
+        .status-attend-1 { background-color: #eaf5ea; color: #1e7e34; font-weight: bold; } /* 出席 */
+        .status-attend-2 { background-color: #fdf3e7; color: #d97706; font-weight: bold; } /* 遅刻 */
+        .status-attend-3 { background-color: #fce8e6; color: #c53030; font-weight: bold; } /* 欠席 */
+
+        button { padding: 6px 12px; cursor: pointer; background-color: #3498db; color: white; border: none; border-radius: 4px; font-size: 13px; transition: background 0.2s; }
         button:hover { background-color: #2980b9; }
-        /* エラー表示スタイル */
-        .error-message { max-width: 600px; margin: 15px auto; padding: 12px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 4px; display: none; text-align: center; font-weight: bold; }
+        button.btn-success { background-color: #2ecc71; }
+        button.btn-success:hover { background-color: #27ae60; }
+        
+        /* エラー表示 */
+        .error-message { padding: 12px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 4px; display: none; text-align: center; font-weight: bold; margin-bottom: 20px; }
     </style>
 </head>
 <body>
 
-    <h1>課題提出管理アプリ (Web UI版)</h1>
-    
-    <div id="error-container" class="error-message"></div>
+    <div class="container">
+        <h1>講義提出・出席総合管理アプリ</h1>
+        
+        <div id="error-container" class="error-message"></div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>週</th>
-                <th>提出状態</th>
-                <th>操作</th>
-            </tr>
-        </thead>
-        <tbody id="task-table-body">
-            </tbody>
-    </table>
+        <div class="info-panel">
+            <div class="info-block">
+                <span class="classroom-display">現在の教室: <span id="room-text" class="classroom-badge">未設定</span></span>
+            </div>
+            <div class="info-block right">
+                <input type="text" id="room-input" placeholder="例: 3号館302教室">
+                <button id="room-submit-btn" class="btn-success">教室を変更</button>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>回数</th>
+                    <th>日付 (カレンダー)</th>
+                    <th>課題提出状態</th>
+                    <th>課題操作</th>
+                    <th>出席状況</th>
+                    <th>出席操作</th>
+                </tr>
+            </thead>
+            <tbody id="main-table-body">
+                </tbody>
+        </table>
+    </div>
 
     <script src="task_manager.js"></script>
     <script>
-        // 状態数値と画面表示のマッピング
-        const statusMap = {
-            0: { text: "未提出", class: "status-0" },
-            1: { text: "提出済", class: "status-1" },
-            2: { text: "課題なし", class: "status-2" }
+        // マッピング定義
+        const taskMap = {
+            0: { text: "未提出", class: "status-task-0" },
+            1: { text: "提出済", class: "status-task-1" },
+            2: { text: "課題なし", class: "status-task-2" }
         };
 
-        // Emscripten(C言語)の読み込みが完了したら自動実行される
+        const attendMap = {
+            0: { text: "未定", class: "status-attend-0" },
+            1: { text: "出席", class: "status-attend-1" },
+            2: { text: "欠席", class: "status-attend-3" }, // C言語の2=欠席
+            3: { text: "遅刻", class: "status-attend-2" }  // C言語の3=遅刻
+        };
+
+        // サブ機能2: カレンダー自動生成関数 (本日から毎週木曜日の日付を設定する例)
+        function getLectureDate(weekIndex) {
+            let d = new Date();
+            // 直近の木曜日（または任意の曜日）に合わせる計算ロジック
+            d.setDate(d.getDate() + (weekIndex * 7));
+            return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+        }
+
         Module['onRuntimeInitialized'] = function() {
-            // C言語の関数を使えるようにJavaScript側に関数登録(ラップ)
+            // C言語関数のラップ
             const getTaskStatus = Module.cwrap('get_task_status', 'number', ['number']);
             const toggleTask = Module.cwrap('toggle_task', 'number', ['number']);
+            const getAttendanceStatus = Module.cwrap('get_attendance_status', 'number', ['number']);
+            const toggleAttendance = Module.cwrap('toggle_attendance', 'number', ['number']);
+            const getClassroom = Module.cwrap('get_classroom', 'string', []);
+            const updateClassroom = Module.cwrap('update_classroom', 'number', ['string']);
 
-            const tbody = document.getElementById('task-table-body');
+            // 初期表示: 教室の場所
+            document.getElementById('room-text').textContent = getClassroom();
 
-            // 1週目から13週目までの行をループで作る
+            // 教室変更ボタンのイベント（手動入力とC言語でのバリデーション検証）
+            document.getElementById('room-submit-btn').onclick = function() {
+                clearError();
+                const inputValue = document.getElementById('room-input').value.trim();
+                
+                // C言語側の関数を呼び出してバリデーションにかけつつ更新
+                const result = updateClassroom(inputValue);
+                
+                if (result === -2) {
+                    showError("【エラー】教室の場所は1文字以上、31文字以内で入力してください。");
+                } else {
+                    document.getElementById('room-text').textContent = getClassroom();
+                    document.getElementById('room-input').value = ""; // 入力欄をクリア
+                }
+            };
+
+            const tbody = document.getElementById('main-table-body');
+
+            // 13週分ループ生成
             for (let i = 1; i <= 13; i++) {
                 const tr = document.createElement('tr');
 
-                // 1. 週番号セル
+                // 1. 回数
                 const tdWeek = document.createElement('td');
-                tdWeek.textContent = `${i}回目`;
+                tdWeek.textContent = `第 ${i} 回`;
                 tr.appendChild(tdWeek);
 
-                // 2. 状態表示セル
-                const tdStatus = document.createElement('td');
-                tdStatus.id = `status-${i}`;
-                const initialStatus = getTaskStatus(i);
-                
-                // C言語側の入力検証エラーチェック
-                if (initialStatus === -1) {
-                    showError("エラー: 初期データの取得に失敗しました。");
-                    return;
-                }
-                updateStatusCell(tdStatus, initialStatus);
-                tr.appendChild(tdStatus);
+                // 2. カレンダー機能 (自動算出された日付を表示)
+                const tdCal = document.createElement('td');
+                tdCal.textContent = getLectureDate(i - 1);
+                tdCal.style.color = "#555";
+                tr.appendChild(tdCal);
 
-                // 3. 操作ボタンセル
-                const tdAction = document.createElement('td');
-                const btn = document.createElement('button');
-                btn.textContent = "状態を変更";
-                btn.onclick = function() {
+                // 3. 課題提出状態
+                const tdTaskStatus = document.createElement('td');
+                updateCell(tdTaskStatus, getTaskStatus(i), taskMap);
+                tr.appendChild(tdTaskStatus);
+
+                // 4. 課題操作ボタン
+                const tdTaskAction = document.createElement('td');
+                const btnTask = document.createElement('button');
+                btnTask.textContent = "変更";
+                btnTask.onclick = function() {
                     clearError();
-                    // C言語の関数を呼び出して状態をトグル
-                    const newStatus = toggleTask(i);
-                    
-                    // C言語側の入力検証エラーチェック
-                    if (newStatus === -1) {
-                        showError(`エラー: ${i}回目の状態変更に失敗しました(範囲外エラー)。`);
-                    } else {
-                        updateStatusCell(tdStatus, newStatus);
-                    }
+                    const nextStatus = toggleTask(i);
+                    if (nextStatus === -1) showError("エラー: 範囲外の週が指定されました。");
+                    else updateCell(tdTaskStatus, nextStatus, taskMap);
                 };
-                tdAction.appendChild(btn);
-                tr.appendChild(tdAction);
+                tdTaskAction.appendChild(btnTask);
+                tr.appendChild(tdTaskAction);
+
+                // 5. 出席状況
+                const tdAttendStatus = document.createElement('td');
+                updateCell(tdAttendStatus, getAttendanceStatus(i), attendMap);
+                tr.appendChild(tdAttendStatus);
+
+                // 6. 出席操作ボタン (選択/トグル式)
+                const tdAttendAction = document.createElement('td');
+                const btnAttend = document.createElement('button');
+                btnAttend.textContent = "出席切替";
+                btnAttend.onclick = function() {
+                    clearError();
+                    const nextAttend = toggleAttendance(i);
+                    if (nextAttend === -1) showError("エラー: 範囲外の週が指定されました。");
+                    else updateCell(tdAttendStatus, nextAttend, attendMap);
+                };
+                tdAttendAction.appendChild(btnAttend);
+                tr.appendChild(tdAttendAction);
 
                 tbody.appendChild(tr);
             }
         };
 
-        // セルの見た目を更新する補助関数
-        function updateStatusCell(cell, status) {
-            cell.textContent = statusMap[status].text;
-            cell.className = statusMap[status].class;
+        function updateCell(cell, statusValue, map) {
+            cell.textContent = map[statusValue].text;
+            cell.className = map[statusValue].class;
         }
 
-        // エラーを表示する関数
-        function showError(message) {
-            const errorContainer = document.getElementById('error-container');
-            errorContainer.textContent = message;
-            errorContainer.style.display = 'block';
+        function showError(msg) {
+            const err = document.getElementById('error-container');
+            err.textContent = msg;
+            err.style.display = 'block';
         }
 
-        // エラーを消す関数
         function clearError() {
             document.getElementById('error-container').style.display = 'none';
         }
