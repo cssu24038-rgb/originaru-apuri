@@ -89,6 +89,7 @@
 
     <script src="task_manager.js"></script>
     <script>
+        // マッピング定義
         const taskMap = {
             0: { text: "未提出", class: "status-task-0" },
             1: { text: "提出済", class: "status-task-1" },
@@ -106,106 +107,116 @@
         let getTaskStatus, toggleTask, getAttendanceStatus, toggleAttendance;
         let getClassroom, updateClassroom, setBaseDate, getBaseYear, getBaseMonth, getBaseDay;
 
-        Module['onRuntimeInitialized'] = function() {
-            // C言語関数のラップ
-            getTaskStatus = Module.cwrap('get_task_status', 'number', ['number']);
-            toggleTask = Module.cwrap('toggle_task', 'number', ['number']);
-            getAttendanceStatus = Module.cwrap('get_attendance_status', 'number', ['number']);
-            toggleAttendance = Module.cwrap('toggle_attendance', 'number', ['number']);
-            getClassroom = Module.cwrap('get_classroom', 'string', []);
-            updateClassroom = Module.cwrap('update_classroom', 'number', ['string']);
-            setBaseDate = Module.cwrap('set_base_date', 'number', ['number', 'number', 'number']);
-            getBaseYear = Module.cwrap('get_base_year', 'number', []);
-            getBaseMonth = Module.cwrap('get_base_month', 'number', []);
-            getBaseDay = Module.cwrap('get_base_day', 'number', []);
-
-            // 初期表示設定
-            document.getElementById('room-text').textContent = getClassroom();
-            
-            // 初期の基準日（未設定の場合は本日の日付を初期候補としてカレンダーに入れる）
-            const today = new Date();
-            const yyyy = today.getFullYear();
-            const mm = String(today.getMonth() + 1).padStart(2, '0');
-            const dd = String(today.getDate()).padStart(2, '0');
-            document.getElementById('base-date-input').value = `${yyyy}-${mm}-${dd}`;
-            
-            // C言語側に初期日付を設定
-            setBaseDate(yyyy, today.getMonth() + 1, today.getDate());
-
-            // 教室変更イベント
-            document.getElementById('room-submit-btn').onclick = function() {
-                clearError();
-                const inputValue = document.getElementById('room-input').value.trim();
-                const result = updateClassroom(inputValue);
-                if (result === -2) {
-                    showError("【エラー】教室の場所は1文字以上、31文字以内で入力してください。");
-                } else {
-                    document.getElementById('room-text').textContent = getClassroom();
-                    document.getElementById('room-input').value = "";
-                }
-            };
-
-            // ★カレンダー変更イベント（第1回が選ばれたらC言語に送り、テーブルを再描画）
-            document.getElementById('base-date-input').onchange = function() {
-                clearError();
-                const dateVal = this.value; // "YYYY-MM-DD"
-                if (!dateVal) return;
-
-                const parts = dateVal.split('-');
-                const year = parseInt(parts[0], 10);
-                const month = parseInt(parts[1], 10);
-                const day = parseInt(parts[2], 10);
-
-                // C言語側のバリデーションを通す
-                const result = setBaseDate(year, month, day);
-                if (result === -3) {
-                    showError("【エラー】無効な日付が選択されました。");
-                } else {
-                    renderTable(); // 2回目以降を自動計算して再描画
-                }
-            };
-
-            // 初回テーブル描画
-            renderTable();
+        // ★より確実な初期化イベントの待ち方に修正
+        (Module.onRuntimeInitialized || function() {}).prototype = {
+            // Emscriptenが古い環境でも動くよう互換性を持たせるため、関数でラップします
         };
 
-        // ★第1回を基準に2回目以降の日付を自動計算してテーブルを構築する関数
+        // 読み込み完了時に実行されるメイン処理
+        function initApp() {
+            try {
+                // C言語関数のラップ
+                getTaskStatus = Module.cwrap('get_task_status', 'number', ['number']);
+                toggleTask = Module.cwrap('toggle_task', 'number', ['number']);
+                getAttendanceStatus = Module.cwrap('get_attendance_status', 'number', ['number']);
+                toggleAttendance = Module.cwrap('toggle_attendance', 'number', ['number']);
+                getClassroom = Module.cwrap('get_classroom', 'string', []);
+                updateClassroom = Module.cwrap('update_classroom', 'number', ['string']);
+                setBaseDate = Module.cwrap('set_base_date', 'number', ['number', 'number', 'number']);
+                getBaseYear = Module.cwrap('get_base_year', 'number', []);
+                getBaseMonth = Module.cwrap('get_base_month', 'number', []);
+                getBaseDay = Module.cwrap('get_base_day', 'number', []);
+
+                // 初期表示設定
+                document.getElementById('room-text').textContent = getClassroom();
+                
+                // 本日の日付を初期値としてセット
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                document.getElementById('base-date-input').value = `${yyyy}-${mm}-${dd}`;
+                
+                setBaseDate(yyyy, today.getMonth() + 1, today.getDate());
+
+                // 教室変更イベントの登録
+                document.getElementById('room-submit-btn').onclick = function() {
+                    clearError();
+                    const inputValue = document.getElementById('room-input').value.trim();
+                    const result = updateClassroom(inputValue);
+                    if (result === -2) {
+                        showError("【エラー】教室の場所は1文字以上、31文字以内で入力してください。");
+                    } else {
+                        document.getElementById('room-text').textContent = getClassroom();
+                        document.getElementById('room-input').value = "";
+                    }
+                };
+
+                // カレンダー変更イベントの登録
+                document.getElementById('base-date-input').onchange = function() {
+                    clearError();
+                    const dateVal = this.value;
+                    if (!dateVal) return;
+
+                    const parts = dateVal.split('-');
+                    const year = parseInt(parts[0], 10);
+                    const month = parseInt(parts[1], 10);
+                    const day = parseInt(parts[2], 10);
+
+                    const result = setBaseDate(year, month, day);
+                    if (result === -3) {
+                        showError("【エラー】無効な日付が選択されました。");
+                    } else {
+                        renderTable();
+                    }
+                };
+
+                // 初回描画
+                renderTable();
+
+            } catch (e) {
+                console.error("初期化エラー:", e);
+                showError("システムの初期化に失敗しました。少し待ってからページを再読み込みしてください。");
+            }
+        }
+
+        // C言語の準備ができたら initApp を実行する
+        if (Module['runtimeInitialized']) {
+            initApp();
+        } else {
+            Module['onRuntimeInitialized'] = initApp;
+        }
+
         function renderTable() {
             const tbody = document.getElementById('main-table-body');
-            tbody.innerHTML = ""; // 既存のテーブルをクリア
+            tbody.innerHTML = "";
 
-            // C言語から現在の第1回授業日を取得
             const by = getBaseYear();
             const bm = getBaseMonth();
             const bd = getBaseDay();
 
-            // 13週分ループ生成
             for (let i = 1; i <= 13; i++) {
                 const tr = document.createElement('tr');
 
-                // 1. 回数
                 const tdWeek = document.createElement('td');
                 tdWeek.textContent = `第 ${i} 回`;
                 tr.appendChild(tdWeek);
 
-                // 2. カレンダー機能 (第1回を基準に(i-1)週間後を自動計算)
                 const tdCal = document.createElement('td');
                 if (by === 0) {
                     tdCal.textContent = "未設定";
                 } else {
                     let dateObj = new Date(by, bm - 1, bd);
-                    dateObj.setDate(dateObj.getDate() + ((i - 1) * 7)); // 1週間(7日)ずつ加算
+                    dateObj.setDate(dateObj.getDate() + ((i - 1) * 7));
                     tdCal.textContent = `${dateObj.getFullYear()}/${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
                 }
                 tdCal.style.color = "#555";
                 tr.appendChild(tdCal);
 
-                // 3. 課題提出状態
                 const tdTaskStatus = document.createElement('td');
                 updateCell(tdTaskStatus, getTaskStatus(i), taskMap);
                 tr.appendChild(tdTaskStatus);
 
-                // 4. 課題操作ボタン
                 const tdTaskAction = document.createElement('td');
                 const btnTask = document.createElement('button');
                 btnTask.textContent = "変更";
@@ -218,12 +229,10 @@
                 tdTaskAction.appendChild(btnTask);
                 tr.appendChild(tdTaskAction);
 
-                // 5. 出席状況
                 const tdAttendStatus = document.createElement('td');
                 updateCell(tdAttendStatus, getAttendanceStatus(i), attendMap);
                 tr.appendChild(tdAttendStatus);
 
-                // 6. 出席操作ボタン
                 const tdAttendAction = document.createElement('td');
                 const btnAttend = document.createElement('button');
                 btnAttend.textContent = "出席切替";
