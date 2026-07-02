@@ -8,7 +8,6 @@
         .container { max-width: 900px; margin: 0 auto; }
         h1 { color: #2c3e50; text-align: center; margin-bottom: 20px; }
         
-        /* 教室・日付入力エリアのスタイル */
         .info-panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; display: table; width: 100%; box-sizing: border-box; }
         .info-block { display: table-cell; width: 50%; vertical-align: middle; }
         .info-block.right { text-align: right; }
@@ -20,12 +19,10 @@
         input[type="date"] { width: 160px; }
         label { font-weight: bold; margin-right: 8px; color: #4a5568; }
         
-        /* テーブルスタイル */
         table { border-collapse: collapse; width: 100%; background-color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; margin-top: 10px; }
         th, td { padding: 12px 15px; text-align: center; border-bottom: 1px solid #eeeeee; }
         th { background-color: #34495e; color: white; font-weight: bold; font-size: 14px; }
         
-        /* 状態ごとのスタイル */
         .status-task-0 { background-color: #fce8e6; color: #a51d24; font-weight: bold; }
         .status-task-1 { background-color: #e6f4ea; color: #137333; font-weight: bold; }
         .status-task-2 { background-color: #f1f3f4; color: #5f6368; }
@@ -40,7 +37,6 @@
         button.btn-success { background-color: #2ecc71; }
         button.btn-success:hover { background-color: #27ae60; }
         
-        /* エラー表示 */
         .error-message { padding: 12px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 4px; display: none; text-align: center; font-weight: bold; margin-bottom: 20px; }
         .divider { border-top: 1px solid #e2e8f0; margin: 15px 0; }
     </style>
@@ -83,13 +79,12 @@
                 </tr>
             </thead>
             <tbody id="main-table-body">
-                </tbody>
+            </tbody>
         </table>
     </div>
 
     <script src="task_manager.js"></script>
     <script>
-        // マッピング定義
         const taskMap = {
             0: { text: "未提出", class: "status-task-0" },
             1: { text: "提出済", class: "status-task-1" },
@@ -103,19 +98,12 @@
             3: { text: "遅刻", class: "status-attend-2" }
         };
 
-        // ラップ用グローバル関数ポインタ
         let getTaskStatus, toggleTask, getAttendanceStatus, toggleAttendance;
         let getClassroom, updateClassroom, setBaseDate, getBaseYear, getBaseMonth, getBaseDay;
+        let setTaskStatus, setAttendanceStatus; // 復元用
 
-        // ★より確実な初期化イベントの待ち方に修正
-        (Module.onRuntimeInitialized || function() {}).prototype = {
-            // Emscriptenが古い環境でも動くよう互換性を持たせるため、関数でラップします
-        };
-
-        // 読み込み完了時に実行されるメイン処理
         function initApp() {
             try {
-                // C言語関数のラップ
                 getTaskStatus = Module.cwrap('get_task_status', 'number', ['number']);
                 toggleTask = Module.cwrap('toggle_task', 'number', ['number']);
                 getAttendanceStatus = Module.cwrap('get_attendance_status', 'number', ['number']);
@@ -126,20 +114,13 @@
                 getBaseYear = Module.cwrap('get_base_year', 'number', []);
                 getBaseMonth = Module.cwrap('get_base_month', 'number', []);
                 getBaseDay = Module.cwrap('get_base_day', 'number', []);
+                setTaskStatus = Module.cwrap('set_task_status', 'number', ['number', 'number']);
+                setAttendanceStatus = Module.cwrap('set_attendance_status', 'number', ['number', 'number']);
 
-                // 初期表示設定
-                document.getElementById('room-text').textContent = getClassroom();
-                
-                // 本日の日付を初期値としてセット
-                const today = new Date();
-                const yyyy = today.getFullYear();
-                const mm = String(today.getMonth() + 1).padStart(2, '0');
-                const dd = String(today.getDate()).padStart(2, '0');
-                document.getElementById('base-date-input').value = `${yyyy}-${mm}-${dd}`;
-                
-                setBaseDate(yyyy, today.getMonth() + 1, today.getDate());
+                // ★データ復元（ロード）処理
+                loadSavedData();
 
-                // 教室変更イベントの登録
+                // 教室変更イベント
                 document.getElementById('room-submit-btn').onclick = function() {
                     clearError();
                     const inputValue = document.getElementById('room-input').value.trim();
@@ -149,10 +130,11 @@
                     } else {
                         document.getElementById('room-text').textContent = getClassroom();
                         document.getElementById('room-input').value = "";
+                        saveAllData(); // 保存
                     }
                 };
 
-                // カレンダー変更イベントの登録
+                // カレンダー変更イベント
                 document.getElementById('base-date-input').onchange = function() {
                     clearError();
                     const dateVal = this.value;
@@ -168,23 +150,76 @@
                         showError("【エラー】無効な日付が選択されました。");
                     } else {
                         renderTable();
+                        saveAllData(); // 保存
                     }
                 };
 
-                // 初回描画
                 renderTable();
 
             } catch (e) {
                 console.error("初期化エラー:", e);
-                showError("システムの初期化に失敗しました。少し待ってからページを再読み込みしてください。");
+                showError("システムの初期化に失敗しました。再読み込みしてください。");
             }
         }
 
-        // C言語の準備ができたら initApp を実行する
+        // C言語の準備ができたら実行
         if (Module['runtimeInitialized']) {
             initApp();
         } else {
             Module['onRuntimeInitialized'] = initApp;
+        }
+
+        // ★データをブラウザに保存する処理
+        function saveAllData() {
+            const data = {
+                classroom: getClassroom(),
+                baseDate: document.getElementById('base-date-input').value,
+                tasks: [],
+                attendance: []
+            };
+
+            for (let i = 1; i <= 13; i++) {
+                data.tasks.push(getTaskStatus(i));
+                data.attendance.push(getAttendanceStatus(i));
+            }
+
+            localStorage.setItem('pbl_app_data', JSON.stringify(data));
+        }
+
+        // ★データをブラウザから読み込む処理
+        function loadSavedData() {
+            const saved = localStorage.getItem('pbl_app_data');
+            if (!saved) {
+                // 初めて開いたときは本日の日付を初期値に
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                document.getElementById('base-date-input').value = `${yyyy}-${mm}-${dd}`;
+                setBaseDate(yyyy, today.getMonth() + 1, today.getDate());
+                return;
+            }
+
+            const data = JSON.parse(saved);
+
+            // 教室名の復元
+            if (data.classroom) updateClassroom(data.classroom);
+            document.getElementById('room-text').textContent = getClassroom();
+
+            // カレンダー日付の復元
+            if (data.baseDate) {
+                document.getElementById('base-date-input').value = data.baseDate;
+                const parts = data.baseDate.split('-');
+                setBaseDate(parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2], 10));
+            }
+
+            // 課題と出席の復元
+            if (data.tasks) {
+                data.tasks.forEach((val, index) => setTaskStatus(index + 1, val));
+            }
+            if (data.attendance) {
+                data.attendance.forEach((val, index) => setAttendanceStatus(index + 1, val));
+            }
         }
 
         function renderTable() {
@@ -223,8 +258,12 @@
                 btnTask.onclick = function() {
                     clearError();
                     const nextStatus = toggleTask(i);
-                    if (nextStatus === -1) showError("エラー: 範囲外の週が指定されました。");
-                    else updateCell(tdTaskStatus, nextStatus, taskMap);
+                    if (nextStatus === -1) {
+                        showError("エラー: 範囲外の週が指定されました。");
+                    } else {
+                        updateCell(tdTaskStatus, nextStatus, taskMap);
+                        saveAllData(); // ★変更時に保存
+                    }
                 };
                 tdTaskAction.appendChild(btnTask);
                 tr.appendChild(tdTaskAction);
@@ -239,8 +278,12 @@
                 btnAttend.onclick = function() {
                     clearError();
                     const nextAttend = toggleAttendance(i);
-                    if (nextAttend === -1) showError("エラー: 範囲外の週が指定されました。");
-                    else updateCell(tdAttendStatus, nextAttend, attendMap);
+                    if (nextAttend === -1) {
+                        showError("エラー: 範囲外の週が指定されました。");
+                    } else {
+                        updateCell(tdAttendStatus, nextAttend, attendMap);
+                        saveAllData(); // ★変更時に保存
+                    }
                 };
                 tdAttendAction.appendChild(btnAttend);
                 tr.appendChild(tdAttendAction);

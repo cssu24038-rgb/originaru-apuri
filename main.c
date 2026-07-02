@@ -22,12 +22,11 @@ int tasks[WEEKS] = {STATUS_UNSUBMITTED};
 int attendance[WEEKS] = {ATTEND_UNDECIDED};
 char classroom_name[32] = "未設定";
 
-// ★追加：第1回の授業日を保持する変数（初期値は0）
 int base_year = 0;
 int base_month = 0;
 int base_day = 0;
 
-// --- 既存の課題・出席・教室ロジック（省略せず維持） ---
+// --- 既存のロジック ---
 EMSCRIPTEN_KEEPALIVE
 int get_task_status(int week_num) {
     if (week_num < 1 || week_num > WEEKS) return ERROR_INVALID_WEEK; 
@@ -70,18 +69,13 @@ int update_classroom(const char* new_name) {
     return 0;
 }
 
-// --- ★新サブ機能：カレンダー第1回日付の設定と検証 ---
 EMSCRIPTEN_KEEPALIVE
 int set_base_date(int year, int month, int day) {
-    // 【入力検証】簡易的な日付の妥当性チェック
-    if (year < 2000 || year > 2100) return ERROR_INVALID_DATE;
-    if (month < 1 || month > 12) return ERROR_INVALID_DATE;
-    if (day < 1 || day > 31) return ERROR_INVALID_DATE;
-
+    if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) return ERROR_INVALID_DATE;
     base_year = year;
     base_month = month;
     base_day = day;
-    return 0; // 成功
+    return 0;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -92,3 +86,19 @@ int get_base_month() { return base_month; }
 
 EMSCRIPTEN_KEEPALIVE
 int get_base_day() { return base_day; }
+
+
+// --- ★新機能：保存データ復元用ロジック ---
+EMSCRIPTEN_KEEPALIVE
+int set_task_status(int week_num, int status) {
+    if (week_num < 1 || week_num > WEEKS) return ERROR_INVALID_WEEK;
+    tasks[week_num - 1] = status;
+    return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int set_attendance_status(int week_num, int status) {
+    if (week_num < 1 || week_num > WEEKS) return ERROR_INVALID_WEEK;
+    attendance[week_num - 1] = status;
+    return 0;
+}

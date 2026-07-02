@@ -28,9 +28,9 @@ jobs:
         uses: mymindstorm/setup-emsdk@v14
 
       - name: Compile C to WebAssembly (Web UI Mode)
-        # カレンダー基準日用の関数をエクスポートに追加してビルドします
+        # 新しい関数をエクスポートに追加
         run: |
-          emcc main.c -o task_manager.js -s EXPORTED_FUNCTIONS="['_toggle_task', '_get_task_status', '_get_attendance_status', '_toggle_attendance', '_get_classroom', '_update_classroom', '_set_base_date', '_get_base_year', '_get_base_month', '_get_base_day']" -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" -s NO_EXIT_RUNTIME=1
+          emcc main.c -o task_manager.js -s EXPORTED_FUNCTIONS="['_toggle_task', '_get_task_status', '_get_attendance_status', '_toggle_attendance', '_get_classroom', '_update_classroom', '_set_base_date', '_get_base_year', '_get_base_month', '_get_base_day', '_set_task_status', '_set_attendance_status']" -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" -s NO_EXIT_RUNTIME=1
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
