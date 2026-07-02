@@ -83,7 +83,7 @@
         </table>
     </div>
 
-    <script src="task_manager.js"></script>
+<script src="task_manager.js"></script>
     <script>
         const taskMap = {
             0: { text: "未提出", class: "status-task-0" },
@@ -100,9 +100,21 @@
 
         let getTaskStatus, toggleTask, getAttendanceStatus, toggleAttendance;
         let getClassroom, updateClassroom, setBaseDate, getBaseYear, getBaseMonth, getBaseDay;
-        let setTaskStatus, setAttendanceStatus; // 復元用
+        let setTaskStatus, setAttendanceStatus;
+
+        // ★ 起動処理を確実に1回だけ呼び出すためのフラグ
+        let isInitialized = false;
 
         function initApp() {
+            // すでに初期化済みの場合は何もしない（二重起動防止）
+            if (isInitialized) return;
+
+            // ラップ処理や読み込みに失敗しても画面が止まらないようチェック
+            if (!Module.cwrap) {
+                console.warn("Emscripten cwrap is not ready yet. Retrying...");
+                return; 
+            }
+
             try {
                 getTaskStatus = Module.cwrap('get_task_status', 'number', ['number']);
                 toggleTask = Module.cwrap('toggle_task', 'number', ['number']);
@@ -117,7 +129,10 @@
                 setTaskStatus = Module.cwrap('set_task_status', 'number', ['number', 'number']);
                 setAttendanceStatus = Module.cwrap('set_attendance_status', 'number', ['number', 'number']);
 
-                // ★データ復元（ロード）処理
+                // フラグを真にする
+                isInitialized = true;
+
+                // データ復元（失敗してもアプリが動くように中でエラーを逃がす）
                 loadSavedData();
 
                 // 教室変更イベント
@@ -130,7 +145,7 @@
                     } else {
                         document.getElementById('room-text').textContent = getClassroom();
                         document.getElementById('room-input').value = "";
-                        saveAllData(); // 保存
+                        saveAllData();
                     }
                 };
 
@@ -150,10 +165,11 @@
                         showError("【エラー】無効な日付が選択されました。");
                     } else {
                         renderTable();
-                        saveAllData(); // 保存
+                        saveAllData();
                     }
                 };
 
+                // テーブルを描画
                 renderTable();
 
             } catch (e) {
@@ -162,68 +178,99 @@
             }
         }
 
-        // C言語の準備ができたら実行
+        // ★ ブラウザとC言語（WebAssembly）双方の準備が整った最適なタイミングで起動させる設定
         if (Module['runtimeInitialized']) {
             initApp();
         } else {
-            Module['onRuntimeInitialized'] = initApp;
-        }
-
-        // ★データをブラウザに保存する処理
-        function saveAllData() {
-            const data = {
-                classroom: getClassroom(),
-                baseDate: document.getElementById('base-date-input').value,
-                tasks: [],
-                attendance: []
+            Module['onRuntimeInitialized'] = function() {
+                initApp();
             };
+        }
+        // 万が一上記のイベントがすり抜けた場合の予備保険
+        window.addEventListener('DOMContentLoaded', function() {
+            setTimeout(initApp, 100);
+        });
 
-            for (let i = 1; i <= 13; i++) {
-                data.tasks.push(getTaskStatus(i));
-                data.attendance.push(getAttendanceStatus(i));
+        // データをブラウザに保存する処理
+        function saveAllData() {
+            try {
+                const data = {
+                    classroom: getClassroom(),
+                    baseDate: document.getElementById('base-date-input').value,
+                    tasks: [],
+                    attendance: []
+                };
+
+                for (let i = 1; i <= 13; i++) {
+                    data.tasks.push(getTaskStatus(i));
+                    data.attendance.push(getAttendanceStatus(i));
+                }
+
+                localStorage.setItem('pbl_app_data', JSON.stringify(data));
+            } catch(e) {
+                console.error("データ保存失敗:", e);
             }
-
-            localStorage.setItem('pbl_app_data', JSON.stringify(data));
         }
 
-        // ★データをブラウザから読み込む処理
+        // データをブラウザから読み込む処理
         function loadSavedData() {
-            const saved = localStorage.getItem('pbl_app_data');
-            if (!saved) {
-                // 初めて開いたときは本日の日付を初期値に
+            // 最初期化用のデフォルト日付作成
+            const setDefaultDate = () => {
                 const today = new Date();
                 const yyyy = today.getFullYear();
                 const mm = String(today.getMonth() + 1).padStart(2, '0');
                 const dd = String(today.getDate()).padStart(2, '0');
                 document.getElementById('base-date-input').value = `${yyyy}-${mm}-${dd}`;
                 setBaseDate(yyyy, today.getMonth() + 1, today.getDate());
-                return;
-            }
+            };
 
-            const data = JSON.parse(saved);
+            try {
+                const saved = localStorage.getItem('pbl_app_data');
+                if (!saved) {
+                    setDefaultDate();
+                    return;
+                }
 
-            // 教室名の復元
-            if (data.classroom) updateClassroom(data.classroom);
-            document.getElementById('room-text').textContent = getClassroom();
+                const data = JSON.parse(saved);
 
-            // カレンダー日付の復元
-            if (data.baseDate) {
-                document.getElementById('base-date-input').value = data.baseDate;
-                const parts = data.baseDate.split('-');
-                setBaseDate(parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2], 10));
-            }
+                // 教室名の復元
+                if (data && data.classroom) updateClassroom(data.classroom);
+                document.getElementById('room-text').textContent = getClassroom();
 
-            // 課題と出席の復元
-            if (data.tasks) {
-                data.tasks.forEach((val, index) => setTaskStatus(index + 1, val));
-            }
-            if (data.attendance) {
-                data.attendance.forEach((val, index) => setAttendanceStatus(index + 1, val));
+                // カレンダー日付の復元
+                if (data && data.baseDate) {
+                    document.getElementById('base-date-input').value = data.baseDate;
+                    const parts = data.baseDate.split('-');
+                    if (parts.length === 3) {
+                        setBaseDate(parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2], 10));
+                    } else {
+                        setDefaultDate();
+                    }
+                } else {
+                    setDefaultDate();
+                }
+
+                // 課題と出席の復元（過去の古いデータで配列が存在しない場合のエラーを防ぐチェック付き）
+                if (data && Array.isArray(data.tasks)) {
+                    data.tasks.forEach((val, index) => {
+                        if (index < 13) setTaskStatus(index + 1, val);
+                    });
+                }
+                if (data && Array.isArray(data.attendance)) {
+                    data.attendance.forEach((val, index) => {
+                        if (index < 13) setAttendanceStatus(index + 1, val);
+                    });
+                }
+            } catch (e) {
+                // 万が一古いデータが壊れて読めなくても、アプリを止めずに初期化する
+                console.warn("保存データの破損または古い形式です。初期化します:", e);
+                setDefaultDate();
             }
         }
 
         function renderTable() {
             const tbody = document.getElementById('main-table-body');
+            if (!tbody) return;
             tbody.innerHTML = "";
 
             const by = getBaseYear();
@@ -262,7 +309,7 @@
                         showError("エラー: 範囲外の週が指定されました。");
                     } else {
                         updateCell(tdTaskStatus, nextStatus, taskMap);
-                        saveAllData(); // ★変更時に保存
+                        saveAllData();
                     }
                 };
                 tdTaskAction.appendChild(btnTask);
@@ -282,7 +329,7 @@
                         showError("エラー: 範囲外の週が指定されました。");
                     } else {
                         updateCell(tdAttendStatus, nextAttend, attendMap);
-                        saveAllData(); // ★変更時に保存
+                        saveAllData();
                     }
                 };
                 tdAttendAction.appendChild(btnAttend);
@@ -293,19 +340,22 @@
         }
 
         function updateCell(cell, statusValue, map) {
+            if (!cell || !map[statusValue]) return;
             cell.textContent = map[statusValue].text;
             cell.className = map[statusValue].class;
         }
 
         function showError(msg) {
             const err = document.getElementById('error-container');
-            err.textContent = msg;
-            err.style.display = 'block';
+            if (err) {
+                err.textContent = msg;
+                err.style.display = 'block';
+            }
         }
 
-        
         function clearError() {
-            document.getElementById('error-container').style.display = 'none';
+            const err = document.getElementById('error-container');
+            if (err) err.style.display = 'none';
         }
     </script>
 </body>
